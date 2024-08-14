@@ -15,6 +15,7 @@
 1. **Clone the Repository**
 
    ```bash
+   sudo apt install git -y
    git clone https://github.com/nuri-it/seclin.git
    cd seclin
    chmod +x seclin.sh
