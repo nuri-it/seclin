@@ -19,7 +19,7 @@
    git clone https://github.com/nuri-it/seclin.git
    cd seclin
    chmod +x seclin.sh
-   bash ./seclin.sh
+   sudo bash ./seclin.sh
 
 2. Follow the On-Screen Prompts
 
