@@ -2,75 +2,64 @@
 
 # Check if the script is run as root
 if [ "$EUID" -ne 0 ]; then
-  echo "You should be admin to start this script."
+  echo "You must be root to run this script."
   exit 1
 fi
 
-# Define tasks
+# Define tasks and their corresponding commands
+declare -A tasks
 tasks=(
-  "Install ufw"
-  "Install unattended-upgrades"
-  "Install fail2ban"
-  "Monitor fail2ban and ufw"
-  "Task 5: Task 5 description"
-  "Task 6: Task 6 description"
-  "Task 7: Task 7 description"
-  "Task 8: Task 8 description"
-  "Task 9: Task 9 description"
-  "Task 10: Task 10 description"
+  [1]="Install ufw"
+  [2]="Install unattended-upgrades"
+  [3]="Install fail2ban"
+  [4]="Add fail2ban and ufw to bashrc"
 )
 
-# Create a temporary file to store the selected tasks
-tempfile=$(mktemp)
+# Install UFW
+install_ufw() {
+  echo "Installing ufw..."
+  apt-get update 1> /dev/null
+  apt-get install ufw -y 1> /dev/null
+  ufw default deny incoming 1> /dev/null
+  ufw default allow outgoing 1> /dev/null
+  read -p "Allow SSH incoming connections? (y/n): " allow_ssh
+  [ "$allow_ssh" = "y" ] && ufw limit 22/tcp
+  ufw enable
+  systemctl enable ufw 1> /dev/null
+  systemctl start ufw 1> /dev/null
+}
 
-# Display tasks and allow user to select
-whiptail --title "Task Selection" --checklist \
-"Select tasks to apply (use arrow keys to navigate and space to select):" 20 78 10 \
-"1" "${tasks[0]}" OFF \
-"2" "${tasks[1]}" OFF \
-"3" "${tasks[2]}" OFF \
-"4" "${tasks[3]}" OFF \
-"5" "${tasks[4]}" OFF \
-"6" "${tasks[5]}" OFF \
-"7" "${tasks[6]}" OFF \
-"8" "${tasks[7]}" OFF \
-"9" "${tasks[8]}" OFF \
-"10" "${tasks[9]}" OFF 2> "$tempfile"
+# Install unattended-upgrades
+install_unattended_upgrades() {
+  echo "Installing unattended-upgrades..."
+  apt-get update 1> /dev/null
+  apt-get install unattended-upgrades -y 1> /dev/null
+  systemctl enable unattended-upgrades 1> /dev/null
+}
 
-# Read selected tasks
-selected_tasks=$(<"$tempfile")
-rm "$tempfile"
+# Install fail2ban
+install_fail2ban() {
+  echo "Installing fail2ban..."
+  apt-get update 1> /dev/null
+  apt-get install fail2ban -y 1> /dev/null
+  cat <<EOF >/etc/fail2ban/jail.local
+[DEFAULT]
+ignoreip = 127.0.0.1/8 ::1
+bantime = 3600
+findtime = 600
+maxretry = 5
 
-# Execute selected tasks
-for task_number in $selected_tasks; do
-  case $task_number in
-    \"1\")
-      echo "Installing ufw..."
-      apt-get update && apt install ufw -y
-      ufw default deny incoming
-      ufw default allow outgoing
-      # Prompt the user to allow SSH incoming connections
-      read -p "Do you want to allow SSH incoming connections? (y/n): " allow_ssh
-      if [ "$allow_ssh" = "y" ]; then
-          ufw limit 22/tcp
-      fi
-      systemctl enable ufw
-      ufw enable
-      ;;
-    \"2\")
-      echo "Installing unattended-upgrades..."
-      apt-get update && apt install unattended-upgrades -y
-      systemctl enable unattended-upgrades.service 
-      ;;
-    \"3\")
-      echo "Installing fail2ban..."
-      apt-get update && apt install fail2ban -y
-      echo -e "[DEFAULT]\nignoreip = 127.0.0.1/8 ::1\nbantime = 3600\nfindtime = 600\nmaxretry = 5\n\n[sshd]\nenabled = true \nport = ssh \nlogpath = /var/log/auth.log"| tee /etc/fail2ban/jail.local > /dev/null
-      touch /var/log/auth.log
-      systemctl enable fail2ban
-      systemctl start fail2ban
-      ;;
-    \"4\")
+[sshd]
+enabled = true
+port = ssh
+logpath = /var/log/auth.log
+EOF
+  systemctl enable fail2ban
+  systemctl start fail2ban
+}
+
+# Monitor fail2ban and ufw status
+monitor_services() {
       echo "Adding fail2ban and ufw status to bashrc..."
 
 
@@ -103,35 +92,30 @@ echo "$content" | tee -a /etc/bash.bashrc > /dev/null
 
 # Print a message indicating success
 echo "Content successfully appended to /etc/bash.bashrc"
+}
 
+# Create a temporary file to store the selected tasks
+tempfile=$(mktemp)
 
+# Display tasks and allow user to select
+whiptail --title "Task Selection" --checklist \
+  "Select tasks to apply:" 20 78 10 \
+  "1" "${tasks[1]}" OFF \
+  "2" "${tasks[2]}" OFF \
+  "3" "${tasks[3]}" OFF \
+  "4" "${tasks[4]}" OFF 2> "$tempfile"
 
-      
-      ;;
-    \"5\")
-      echo "Running Task 5..."
-      # Add your command here
-      ;;
-    \"6\")
-      echo "Running Task 6..."
-      # Add your command here
-      ;;
-    \"7\")
-      echo "Running Task 7..."
-      # Add your command here
-      ;;
-    \"8\")
-      echo "Running Task 8..."
-      # Add your command here
-      ;;
-    \"9\")
-      echo "Running Task 9..."
-      # Add your command here
-      ;;
-    \"10\")
-      echo "Running Task 10..."
-      # Add your command here
-      ;;
+# Read selected tasks
+selected_tasks=$(<"$tempfile")
+rm "$tempfile"
+
+# Execute selected tasks
+for task_number in $selected_tasks; do
+  case $task_number in
+    \"1\") install_ufw ;;
+    \"2\") install_unattended_upgrades ;;
+    \"3\") install_fail2ban ;;
+    \"4\") monitor_services ;;
   esac
 done
 
